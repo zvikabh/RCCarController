@@ -37,7 +37,6 @@ public class MainActivity extends Activity {
         findDevice();
     }
 
-
     /**
      * Finds the Arduino USB device.
      */
@@ -55,7 +54,8 @@ public class MainActivity extends Activity {
             		(lastVendorId == ARDUINO_CLONE_VENDOR_ID && lastProductId == ARDUINO_CLONE_PRODUCT_ID)) {
         		Log.d(TAG, "Found Arduino device");
         		Toast.makeText(getBaseContext(), "Found Arduino device", Toast.LENGTH_LONG).show();
-        		// TODO: Pass the USB device to the service.
+        		// TODO: Get permission for device, and pass it to the service.
+        		// See ArduinoCommunicatorActivity.java:115.
         		return true;
             }
         }
