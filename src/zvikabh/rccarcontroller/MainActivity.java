@@ -17,7 +17,7 @@ import android.widget.SeekBar.OnSeekBarChangeListener;
 import android.widget.Toast;
 
 
-/*
+/**
  * Main activity for controlling the RC car.
  * Portions taken from Arduino Communicator, https://github.com/jeppsson/Arduino-Communicator
  */
@@ -33,13 +33,17 @@ public class MainActivity extends Activity {
     private static final int ARDUINO_CLONE_VENDOR_ID = 0x0403;  // 1027
     private static final int ARDUINO_CLONE_PRODUCT_ID = 0x6001;  // 24577
     
-    // SeekBars for the commands to the left and right motors.
+    /**
+     * SeekBars for the commands to the left and right motors.
+     */
     private SeekBar mSeekbarLeft;
     private SeekBar mSeekbarRight;
     
-    // Receives notifications of changes in one of the seek bars.
-    // Which seek bar has changed is irrelevant, since we check the values of both of them
-    // whenever a change occurs.
+    /**
+     * Receives notifications of changes in one of the seek bars.
+     * Which seek bar has changed is irrelevant, since we check the values of both of them
+     * whenever a change occurs.
+     */
     private SeekBarChangeListener mSeekBarChangeListener = new SeekBarChangeListener();
 
     @Override

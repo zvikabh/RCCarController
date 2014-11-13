@@ -31,13 +31,15 @@ public class RCCarControllerService extends Service {
 	// Is the service currently running?
     private volatile boolean mIsRunning = false;
     
-    // The Arduino USB device.
+    // The Arduino USB device and associated connections.
     private volatile UsbDevice mUsbDevice = null;
     private volatile UsbDeviceConnection mUsbConnection = null;
     private volatile UsbEndpoint mInUsbEndpoint = null;
     private volatile UsbEndpoint mOutUsbEndpoint = null;
     
-    // Thread used for sending data to the Arduino.
+    /**
+     * Thread used for sending data to the Arduino.
+     */
     private SenderThread mSenderThread;
 
     @Override
