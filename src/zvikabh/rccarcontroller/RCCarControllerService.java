@@ -1,5 +1,7 @@
 package zvikabh.rccarcontroller;
 
+import java.util.HashMap;
+
 import android.annotation.SuppressLint;
 import android.app.Service;
 import android.content.BroadcastReceiver;
@@ -105,6 +107,13 @@ public class RCCarControllerService extends Service {
     
     private boolean initDevice() {
         UsbManager usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
+        
+        if (usbManager.hasPermission(mUsbDevice)) {
+        	Log.d(TAG, "USB Manager says we have permission to access the device.");
+        } else {
+        	Log.e(TAG, "USB Manager says we DON'T have permission to access the device!");
+        }
+        
         mUsbConnection = usbManager.openDevice(mUsbDevice);
         if (mUsbConnection == null) {
             Log.e(TAG, "Opening USB device failed!");
@@ -203,6 +212,7 @@ public class RCCarControllerService extends Service {
     }
     
 	BroadcastReceiver mReceiver = new BroadcastReceiver() {
+		
         @Override
         public void onReceive(Context context, Intent intent) {
         	String action = intent.getAction();
@@ -223,7 +233,8 @@ public class RCCarControllerService extends Service {
                 // Send data in sender thread.
                 mSenderThread.mHandler.obtainMessage(10, dataToSend).sendToTarget();
         	}
-        }		
+        }
+        
 	};
 
 }
