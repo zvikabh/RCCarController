@@ -23,12 +23,6 @@
             </intent-filter>
         </activity>
         
-        <service
-            android:name=".RCCarControllerService"
-            android:label="RC Car Controller Service"
-            android:enabled="true" >
-        </service>
-
     </application>
     
 </manifest>
