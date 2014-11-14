@@ -18,12 +18,20 @@ void loop() {
   byte receivedData[12];
   
   int bytesReceived = Serial.readBytes((char*)receivedData, 8);
+  
+  if (bytesReceived == 0) {
+    // Wait for communications.
+    delay(500);
+    return;
+  }
+  
   if (bytesReceived < 8) {
     // Incomplete or missing communications.
     // Stop motors and wait for valid message.
-    Serial.print(bytesReceived);
+    Serial.print(bytesReceived, DEC);
     Serial.println(" bytes rcvd - expected 8");
     stopMotors();
+    delay(500);
     return;
   }
   
@@ -53,9 +61,9 @@ void loop() {
   }
   
   // Valid message found. Decode it and send to motor.
-  short leftPos = receivedData[dataPos] |
+  short leftPos = (((short)receivedData[dataPos]) & 0xff) |
       (((short)receivedData[dataPos+1]) << 8);
-  short rightPos = receivedData[dataPos+2] |
+  short rightPos = (((short)receivedData[dataPos+2]) & 0xff) |
       (((short)receivedData[dataPos+3]) << 8);
   
   Serial.print("L=");
