@@ -2,6 +2,7 @@ package zvikabh.rccarcontroller;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.Intent;
 import android.hardware.usb.UsbConstants;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
@@ -18,6 +19,9 @@ import android.widget.Toast;
  * Class for handling communication with a USB device.
  */
 public class UsbCommHandler {
+	
+	static final String ACTION_DATA_RECEIVED = "zvikabh.rccarcontroller.DATA_RECEIVED";
+	static final String DATA_EXTRA = "zvikabh.rccarcontroller.extra.DATA";
 
 	/**
 	 * Initializes communications with the specified device at the specified baudrate.
@@ -33,6 +37,8 @@ public class UsbCommHandler {
 		
 		mSenderThread = new SenderThread();
 		mSenderThread.start();
+		
+		new ReceiverThread().start();
 	}
 	
 	/**
@@ -78,18 +84,19 @@ public class UsbCommHandler {
             return false;
         }
 
-        // Arduino USB serial converter setup
-        // Set control line state
+        // Arduino USB serial converter setup:
+        // Set control line state.
         mUsbConnection.controlTransfer(0x21, 0x22, 0, 0, null, 0, 0);
         // Set line encoding.
         mUsbConnection.controlTransfer(0x21, 0x20, 0, 0, getLineEncoding(mBaudRate), 7, 0);
 
         for (int i = 0; i < usbInterface.getEndpointCount(); i++) {
-            if (usbInterface.getEndpoint(i).getType() == UsbConstants.USB_ENDPOINT_XFER_BULK) {
-                if (usbInterface.getEndpoint(i).getDirection() == UsbConstants.USB_DIR_IN) {
-                    mInUsbEndpoint = usbInterface.getEndpoint(i);
+        	UsbEndpoint endpoint = usbInterface.getEndpoint(i);
+            if (endpoint.getType() == UsbConstants.USB_ENDPOINT_XFER_BULK) {
+                if (endpoint.getDirection() == UsbConstants.USB_DIR_IN) {
+                    mInUsbEndpoint = endpoint;
                 } else if (usbInterface.getEndpoint(i).getDirection() == UsbConstants.USB_DIR_OUT) {
-                    mOutUsbEndpoint = usbInterface.getEndpoint(i);
+                    mOutUsbEndpoint = endpoint;
                 }
             }
         }
@@ -141,11 +148,6 @@ public class UsbCommHandler {
                         Log.d(TAG, "calling bulkTransfer() out");
                         final int len = mUsbConnection.bulkTransfer(mOutUsbEndpoint, dataToSend, dataToSend.length, 0);
                         Log.d(TAG, len + " of " + dataToSend.length + " bytes sent.");
-                        
-                        // TODO: Do we still want the following lines?
-                        //Intent sendIntent = new Intent(DATA_SENT_INTERNAL_INTENT);
-                        //sendIntent.putExtra(DATA_EXTRA, dataToSend);
-                        //sendBroadcast(sendIntent);
                     } else if (msg.what == 11) {
                         Looper.myLooper().quit();
                     }
@@ -155,6 +157,34 @@ public class UsbCommHandler {
             Looper.loop();
             Log.i(TAG, "sender thread stopped");
         }
+    }
+    
+    private class ReceiverThread extends Thread {
+    	public ReceiverThread() {
+    		super("arduino_receiver");
+    	}
+    	
+    	public void run() {
+    		byte[] buffer = new byte[4096];
+    		while (mDevice != null) {
+                int len = mUsbConnection.bulkTransfer(mInUsbEndpoint, buffer, buffer.length, 0);
+                if (len == 0) {
+                	continue;  // No data read.
+                }
+                if (len < 0) {
+                	Log.e(TAG, "Transfer from USB failed.");
+                	continue;
+                }
+                // Make a copy of the buffer, since we are going to continue overwriting the input.
+    			Log.d(TAG, "Received " + len + " bytes from USB device");
+                byte[] receivedData = new byte[len];
+                System.arraycopy(buffer, 0, receivedData, 0, len);
+                // Send the received data as an intent.
+                Intent intent = new Intent(ACTION_DATA_RECEIVED);
+                intent.putExtra(DATA_EXTRA, receivedData);
+                mContext.sendBroadcast(intent);
+    		}
+    	}
     }
     
     private int mBaudRate;

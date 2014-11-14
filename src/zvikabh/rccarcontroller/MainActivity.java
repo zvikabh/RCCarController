@@ -1,5 +1,6 @@
 package zvikabh.rccarcontroller;
 
+import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
 
 import android.app.Activity;
@@ -16,6 +17,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.SeekBar;
 import android.widget.SeekBar.OnSeekBarChangeListener;
+import android.widget.TextView;
 import android.widget.Toast;
 
 
@@ -42,6 +44,7 @@ public class MainActivity extends Activity {
      */
     private SeekBar mSeekbarLeft;
     private SeekBar mSeekbarRight;
+    private TextView mTextviewArduinoResponse;
     
     /**
      * Receives notifications of changes in one of the seek bars.
@@ -57,11 +60,14 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         
-        IntentFilter filter = new IntentFilter(ACTION_USB_PERMISSION);
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(ACTION_USB_PERMISSION);
+        filter.addAction(UsbCommHandler.ACTION_DATA_RECEIVED);
         registerReceiver(mUsbReceiver, filter);
         
         mSeekbarLeft = (SeekBar) findViewById(R.id.seekBarLeft);
         mSeekbarRight = (SeekBar) findViewById(R.id.seekBarRight);
+        mTextviewArduinoResponse = (TextView) findViewById(R.id.textviewArduinoResponse);
 
         mSeekbarLeft.setOnSeekBarChangeListener(mSeekBarChangeListener);
         mSeekbarRight.setOnSeekBarChangeListener(mSeekBarChangeListener);
@@ -186,10 +192,35 @@ public class MainActivity extends Activity {
 	                    Log.e(TAG, "permission denied for device " + device);
 	                }
 	            }
+	        } else if (UsbCommHandler.ACTION_DATA_RECEIVED.equals(action)) {
+	        	byte[] receivedData = intent.getByteArrayExtra(UsbCommHandler.DATA_EXTRA);
+	        	if (receivedData.length == 0) {
+	        		return;
+	        	}
+	        	
+	        	String receivedString;
+	        	try {
+					receivedString = new String(receivedData, "UTF-8");
+				} catch (UnsupportedEncodingException e) {
+					receivedString = "Invalid UTF-8 string received";
+				}
+	        	mTextviewArduinoResponse.setText(receivedString);
+	        	Log.d(TAG, "Received data: " + bytesToHex(receivedData));
 	        }
 	    }
 	    
 	};
+	
+	final private static char[] HEX_ARRAY = "0123456789ABCDEF".toCharArray();
+	public static String bytesToHex(byte[] bytes) {
+	    char[] hexChars = new char[bytes.length * 2];
+	    for ( int j = 0; j < bytes.length; j++ ) {
+	        int v = bytes[j] & 0xFF;
+	        hexChars[j * 2] = HEX_ARRAY[v >>> 4];
+	        hexChars[j * 2 + 1] = HEX_ARRAY[v & 0x0F];
+	    }
+	    return new String(hexChars);
+	}
 	
 	private UsbCommHandler mUsbCommHandler = null;
 }

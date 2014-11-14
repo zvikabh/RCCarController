@@ -9,69 +9,76 @@
     tools:context="zvikabh.rccarcontroller.MainActivity" >
 
     <LinearLayout
-        android:baselineAligned="false"
+        android:id="@+id/linearLayout1"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-		android:paddingLeft="16dp"
-    	android:paddingRight="16dp"
-	    android:orientation="horizontal" >
-        
-        <LinearLayout
-	        android:layout_width="wrap_content"
-	        android:layout_height="wrap_content"
-	        android:layout_weight="1"
-            android:orientation="vertical" >
-            
-		    <TextView
-		        android:layout_width="match_parent"
-		        android:layout_height="wrap_content"
-		        android:gravity="center"
-		        android:text="Left Motor" />
+        android:layout_height="wrap_content"
+        android:baselineAligned="false"
+        android:orientation="horizontal"
+        android:paddingLeft="16dp"
+        android:paddingRight="16dp" >
 
-		    <SeekBar
-		        android:id="@+id/seekBarLeft"
-		        android:layout_width="match_parent"
-		        android:layout_height="wrap_content"
-		        android:layout_marginTop="15dp"
-		        android:max="201"
-		        android:progress="100" />
-
-		    <TextView
-		        android:layout_width="match_parent"
-		        android:layout_height="wrap_content"
-		        android:gravity="center"
-		        android:text="|" />
-		    
-        </LinearLayout>
-	
         <LinearLayout
-	        android:layout_width="wrap_content"
-	        android:layout_height="wrap_content"
-	        android:layout_weight="1"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:orientation="vertical" >
-            
-		    <TextView
-		        android:layout_width="match_parent"
-		        android:layout_height="wrap_content"
-		        android:gravity="center"
-		        android:text="Right Motor" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="Left Motor" />
 
             <SeekBar
-		        android:id="@+id/seekBarRight"
-		        android:layout_width="match_parent"
-		        android:layout_height="match_parent"
-		        android:layout_marginTop="15dp"
-		        android:max="201"
-		        android:progress="100" />
+                android:id="@+id/seekBarLeft"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="15dp"
+                android:max="201"
+                android:progress="100" />
 
-		    <TextView
-		        android:layout_width="match_parent"
-		        android:layout_height="wrap_content"
-		        android:gravity="center"
-		        android:text="|" />
-            
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="|" />
         </LinearLayout>
 
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical" >
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="Right Motor" />
+
+            <SeekBar
+                android:id="@+id/seekBarRight"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginTop="15dp"
+                android:max="201"
+                android:progress="100" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="|" />
+        </LinearLayout>
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/textviewArduinoResponse"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/linearLayout1"
+        android:layout_below="@+id/linearLayout1"
+        android:layout_marginTop="30dp"
+        android:text="foo" />
 
 </RelativeLayout>
