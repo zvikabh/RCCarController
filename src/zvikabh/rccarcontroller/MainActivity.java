@@ -140,7 +140,7 @@ public class MainActivity extends Activity {
 			int leftPos = mSeekbarLeft.getProgress() - mSeekbarLeft.getMax() / 2;
 			int rightPos = mSeekbarRight.getProgress() - mSeekbarRight.getMax() / 2;
 			
-			byte[] data = new byte[] { (byte)0xFF, 0x7F, (byte)0x80, 0x00, 0x00, 0x00, 0x00, 0x00 };
+			byte[] data = new byte[] { 0x7F, 0x7F, (byte)0x80, (byte)0x80, 0x00, 0x00, 0x00, 0x00 };
 			data[4] = (byte) (leftPos & 0xFF);
 			data[5] = (byte) ((leftPos >> 8) & 0xFF);
 			data[6] = (byte) (rightPos & 0xFF);

@@ -17,10 +17,12 @@ void loop() {
   int dataPos;
   byte receivedData[12];
   
-  int bytesReceived = Serial.readBytes(receivedData, 8);
+  int bytesReceived = Serial.readBytes((char*)receivedData, 8);
   if (bytesReceived < 8) {
     // Incomplete or missing communications.
     // Stop motors and wait for valid message.
+    Serial.print(bytesReceived);
+    Serial.println(" bytes rcvd - expected 8");
     stopMotors();
     return;
   }
@@ -45,6 +47,7 @@ void loop() {
   
   if (i == 8) {
     // Sync bytes not found. Wait for a valid message.
+    Serial.println("Sync bytes not found");
     stopMotors();
     return;
   }
@@ -54,6 +57,12 @@ void loop() {
       (((short)receivedData[dataPos+1]) << 8);
   short rightPos = receivedData[dataPos+2] |
       (((short)receivedData[dataPos+3]) << 8);
+  
+  Serial.print("L=");
+  Serial.print(leftPos);
+  Serial.print("  R=");
+  Serial.println(rightPos);
+  
   md.setSpeeds(rightPos, leftPos);
 }
 
