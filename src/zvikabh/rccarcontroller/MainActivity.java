@@ -17,8 +17,6 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.widget.SeekBar;
-import android.widget.SeekBar.OnSeekBarChangeListener;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -48,17 +46,9 @@ public class MainActivity extends Activity {
 	/**
      * SeekBars for the commands to the left and right motors.
      */
-    private SeekBar mSeekbarLeft;
-    private SeekBar mSeekbarRight;
     private TextView mTextviewArduinoResponse;
+    private SpeedControllerView mViewSpeedController;
     
-    /**
-     * Receives notifications of changes in one of the seek bars.
-     * Which seek bar has changed is irrelevant, since we check the values of both of them
-     * whenever a change occurs.
-     */
-    private SeekBarChangeListener mSeekBarChangeListener = new SeekBarChangeListener();
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -67,13 +57,10 @@ public class MainActivity extends Activity {
 
         setContentView(R.layout.activity_main);
         
-        mSeekbarLeft = (SeekBar) findViewById(R.id.seekBarLeft);
-        mSeekbarRight = (SeekBar) findViewById(R.id.seekBarRight);
         mTextviewArduinoResponse = (TextView) findViewById(R.id.textviewArduinoResponse);
+        mViewSpeedController = (SpeedControllerView) findViewById(R.id.viewSpeedController);
+        mViewSpeedController.setThrottleChangedListener(new ThrottleChangeListener());
 
-        mSeekbarLeft.setOnSeekBarChangeListener(mSeekBarChangeListener);
-        mSeekbarRight.setOnSeekBarChangeListener(mSeekBarChangeListener);
-        
         IntentFilter filter = new IntentFilter();
         filter.addAction(ACTION_USB_PERMISSION);
         registerReceiver(mBroadcastReceiver, filter);
@@ -150,45 +137,73 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * Class for handling notifications of changes to one of the motor's seek bars.
+     * Class for handling notifications of user throttle changes.
      */
-    private class SeekBarChangeListener implements OnSeekBarChangeListener {
-    	
+    private class ThrottleChangeListener implements SpeedControllerView.ThrottleChangedListener {
+
 		@Override
-		public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+		public void throttleChanged(float x, float y) {
 			if (mUsbSerialPort == null) {
 				Log.w(TAG, "Cannot update Arduino - connection to Arduino was unsuccessful.");
 				return;
 			}
+
+			// Maximum power to deliver to each motor, on a scale of [0,1].
+			final double maxPower = Math.min(1, Math.sqrt(x*x + y*y));
+
+			// Angle in which car should move:
+			// -pi:   turn left
+			// -pi/2: backward
+			// 0:     turn right
+			// pi/2:  forward
+			// pi:    turn left
+			final double angle = Math.atan2(-y, x);
 			
-			int leftPos = mSeekbarLeft.getProgress() - mSeekbarLeft.getMax() / 2;
-			int rightPos = mSeekbarRight.getProgress() - mSeekbarRight.getMax() / 2;
+			final double pi = Math.PI;
 			
-			byte[] data = new byte[] { 0x7F, 0x7F, (byte)0x80, (byte)0x80, 0x00, 0x00, 0x00, 0x00 };
-			data[4] = (byte) (leftPos & 0xFF);
-			data[5] = (byte) ((leftPos >> 8) & 0xFF);
-			data[6] = (byte) (rightPos & 0xFF);
-			data[7] = (byte) ((rightPos >> 8) & 0xFF);
+			// Fraction of max power to deliver to the left and right motors.
+			// Each motor (separately) is in the range [-1,1].
+			double leftPower, rightPower;
+			if (angle < -pi/2) {
+				// angle is in [-pi, -pi/2].
+				leftPower = -1.0;
+				rightPower = -(angle + pi*0.75) / (pi/4);
+			} else if (angle < 0) {
+				// angle is in [-pi/2, 0].
+				leftPower = (angle + pi/4) / (pi/4);
+				rightPower = -1.0;
+			} else if (angle < pi/2) {
+				// angle is in [0, pi/2].
+				leftPower = 1.0;
+				rightPower = (angle - pi/4) / (pi/4);
+			} else {
+				// angle is in [pi/2, pi].
+				leftPower = -(angle - pi*0.75) / (pi/4);
+				rightPower = 1.0;
+			}
+						
+			final short leftPowerLevel = (short) (400 * leftPower * maxPower);
+			final short rightPowerLevel = (short) (400 * rightPower * maxPower);
 			
+			final byte[] data = new byte[] { 0x7F, 0x7F, (byte)0x80, (byte)0x80, 0x00, 0x00, 0x00, 0x00 };
+			data[4] = (byte) (leftPowerLevel & 0xFF);
+			data[5] = (byte) ((leftPowerLevel >> 8) & 0xFF);
+			data[6] = (byte) (rightPowerLevel & 0xFF);
+			data[7] = (byte) ((rightPowerLevel >> 8) & 0xFF);
+			
+			mTextviewArduinoResponse.setText("L="+leftPowerLevel+"  R="+rightPowerLevel);
+
 			try {
 				mUsbSerialPort.write(data, 500);
 			} catch (IOException e) {
 				Log.w(TAG, "Failed to write to USB serial port: " + e.toString());
 			}
 		}
-	
-		@Override
-		public void onStartTrackingTouch(SeekBar arg0) {
-		}
-	
-		@Override
-		public void onStopTrackingTouch(SeekBar arg0) {
-		}
-		
+    	
     }
     
 	final private static char[] HEX_ARRAY = "0123456789ABCDEF".toCharArray();
-	public static String bytesToHex(byte[] bytes) {
+	private static String bytesToHex(byte[] bytes) {
 	    char[] hexChars = new char[bytes.length * 2];
 	    for ( int j = 0; j < bytes.length; j++ ) {
 	        int v = bytes[j] & 0xFF;
