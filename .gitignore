@@ -15,8 +15,12 @@ libs/
 bin/
 gen/
 
+# This library should be taken from https://github.com/mik3y/usb-serial-for-android
+usb-serial-for-android/
+
 # Local configuration file (sdk path, etc)
 local.properties
 .settings/
+.metadata/
 .classpath
 .project
