@@ -23,6 +23,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        
+        <service
+            android:name=".RCCarReceiverService"
+            android:label="RC Car Receiver Service"
+            android:enabled="true" />
     </application>
 
 </manifest>

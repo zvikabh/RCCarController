@@ -41,6 +41,7 @@ public class RCCarReceiverService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        Log.d(TAG, "Receiver service onStartCommand");
         synchronized (this) {
             if (mReceiverMasterThread != null) {
                 Log.w(TAG, "Receiver service already running");
