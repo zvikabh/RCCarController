@@ -41,16 +41,21 @@ public class RCCarReceiverService extends Service {
         Log.d(TAG, "Receiver service onStartCommand");
         synchronized (this) {
             if (mReceiverMasterThread != null && mReceiverMasterThread.isAlive()) {
-                Toast.makeText(this, "Receiver already running", Toast.LENGTH_LONG).show();
+                makeToast("Receiver already running");
                 return START_STICKY;
             } 
         }
         
-        mIpAddress = intent.getStringExtra(MainActivity.INTENT_EXTRA_IP_ADDRESS);
-        mIpPort = intent.getIntExtra(MainActivity.INTENT_EXTRA_PORT, -1);
+        if (intent == null) { 
+            // Attempting to restart the service. 
+            // Keep the IP address and port from the previous call.
+        } else {
+            mIpAddress = intent.getStringExtra(MainActivity.INTENT_EXTRA_IP_ADDRESS);
+            mIpPort = intent.getIntExtra(MainActivity.INTENT_EXTRA_PORT, -1);
+        }
         
         if (mIpAddress == null || mIpPort == -1) {
-            Toast.makeText(this, "IP Address or Port not received by service", Toast.LENGTH_LONG).show();
+            makeToast("IP Address or Port not received by service");
             return START_NOT_STICKY;
         }
         
@@ -102,7 +107,7 @@ public class RCCarReceiverService extends Service {
         }
         
         Log.e(TAG, "No Arduino devices found");
-        Toast.makeText(this, "No Arduino devices found", Toast.LENGTH_LONG).show();
+        makeToast("No Arduino devices found");
         stopSelf();
         return false;
     }
@@ -151,7 +156,7 @@ public class RCCarReceiverService extends Service {
         if (connection == null) {
             // Strange - we were supposed to have already gotten permission.
             Log.e(TAG, "No permission to access device");
-            Toast.makeText(this, "No permission to access device", Toast.LENGTH_LONG).show();
+            makeToast("No permission to access device");
             mUsbSerialPort = null;
             return false;
         }
@@ -159,7 +164,7 @@ public class RCCarReceiverService extends Service {
         List<UsbSerialPort> ports = mUsbSerialDriver.getPorts();
         if (ports.size() == 0) {
             Log.e(TAG, "Device has 0 ports");
-            Toast.makeText(this, "Device has 0 ports", Toast.LENGTH_LONG).show();
+            makeToast("Device has 0 ports");
             mUsbSerialPort = null;
             return false;
         }
@@ -173,7 +178,7 @@ public class RCCarReceiverService extends Service {
         } catch (IOException e) {
             mUsbSerialPort = null;
             Log.e(TAG, "Could not open port");
-            Toast.makeText(this, "Could not open port", Toast.LENGTH_LONG).show();
+            makeToast("Could not open port");
             return false;
         }
         
@@ -203,7 +208,7 @@ public class RCCarReceiverService extends Service {
                 socket = new Socket(mIpAddress, mIpPort);
                 inputStream = socket.getInputStream();
             } catch (Exception e) {
-                Toast.makeText(RCCarReceiverService.this, "Cannot connect to controller", Toast.LENGTH_LONG).show();
+                makeToast("Cannot connect to controller");
                 Log.e(TAG, "Error in server socket: " + e.toString());
                 if (socket != null) {
                     try {
@@ -215,11 +220,14 @@ public class RCCarReceiverService extends Service {
                 return;
             }
             
+            Log.d(TAG, "Connection opened");
+            
             try {
                 byte[] bytesRead = new byte[MESSAGE_LENGTH];
                 while (true) {
                     for (int i = 0; i < MESSAGE_LENGTH; i++) {
                         int inputByte = inputStream.read();
+                        Log.d(TAG, "Read byte: " + inputByte);
                         if (inputByte < 0) {
                             Log.i(TAG, "End of stream reached - closing thread");
                             return;
@@ -229,8 +237,7 @@ public class RCCarReceiverService extends Service {
                     
                     if (!validateMessage(bytesRead)) {
                         Log.w(TAG, "Invalid message received: " + bytesToHex(bytesRead));
-                        Toast.makeText(RCCarReceiverService.this, 
-                                "Invalid message received: " + bytesToHex(bytesRead), Toast.LENGTH_SHORT).show();
+                        makeToast("Invalid message received: " + bytesToHex(bytesRead));
                         continue;
                     }
                     if (mArduinoThread == null || mArduinoThread.mHandler == null) {
@@ -329,8 +336,20 @@ public class RCCarReceiverService extends Service {
         return new String(hexChars);
     }
     
-    private String mIpAddress;
-    private int mIpPort;
+    void makeToast(final String toastText) {
+        Context context = getBaseContext();
+        new Handler(context.getMainLooper()).post(new Runnable() {
+
+            @Override
+            public void run() {
+                Toast.makeText(getApplicationContext(), toastText, Toast.LENGTH_SHORT).show();
+            }
+            
+        });
+    }
+    
+    private String mIpAddress = null;
+    private int mIpPort = -1;
 
     private static final String TAG = "RCCarReceiverService";
 
