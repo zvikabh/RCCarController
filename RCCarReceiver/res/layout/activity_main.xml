@@ -9,13 +9,21 @@
     tools:context="zvikabh.rccarreceiver.MainActivity" >
 
     <TextView
-        android:id="@+id/textView1"
+        android:id="@+id/textViewIP"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignParentLeft="true"
         android:layout_alignParentTop="true"
         android:layout_marginLeft="15dp"
         android:layout_marginTop="15dp"
-        android:text="Set your controller to IP: 1.1.1.1" />
+        android:text="Set your controller to one of the following IP addresses:" />
+
+    <ListView
+        android:id="@+id/ipAddressesList"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/textViewIP"
+        android:layout_below="@+id/textViewIP"
+        android:layout_marginTop="18dp" />
 
 </RelativeLayout>
