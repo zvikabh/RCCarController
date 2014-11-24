@@ -2,7 +2,6 @@ package zvikabh.rccarreceiver;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.List;
 
@@ -29,8 +28,6 @@ import com.hoho.android.usbserial.driver.UsbSerialProber;
 
 public class RCCarReceiverService extends Service {
     
-    public static final int PORT = 14902;
-
     public RCCarReceiverService() {
     }
 
@@ -43,13 +40,21 @@ public class RCCarReceiverService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(TAG, "Receiver service onStartCommand");
         synchronized (this) {
-            if (mReceiverMasterThread != null) {
-                Log.w(TAG, "Receiver service already running");
+            if (mReceiverMasterThread != null && mReceiverMasterThread.isAlive()) {
+                Toast.makeText(this, "Receiver already running", Toast.LENGTH_LONG).show();
                 return START_STICKY;
             } 
         }
         
-        // Register the receiver which will resume the startup sequence after the user grants
+        mIpAddress = intent.getStringExtra(MainActivity.INTENT_EXTRA_IP_ADDRESS);
+        mIpPort = intent.getIntExtra(MainActivity.INTENT_EXTRA_PORT, -1);
+        
+        if (mIpAddress == null || mIpPort == -1) {
+            Toast.makeText(this, "IP Address or Port not received by service", Toast.LENGTH_LONG).show();
+            return START_NOT_STICKY;
+        }
+        
+        // Register the receiver which will continue the startup sequence after the user grants
         // access permissions to the USB device.
         IntentFilter filter = new IntentFilter();
         filter.addAction(ACTION_USB_PERMISSION);
@@ -123,7 +128,7 @@ public class RCCarReceiverService extends Service {
                         mArduinoThread = new ArduinoCommunicatorThread();
                         mArduinoThread.start();
 
-                        mReceiverMasterThread = new ReceiverMasterThread();
+                        mReceiverMasterThread = new ReceiverThread();
                         mReceiverMasterThread.start();
                     }
                 }
@@ -178,45 +183,39 @@ public class RCCarReceiverService extends Service {
     private volatile UsbSerialPort mUsbSerialPort;
     private volatile UsbSerialDriver mUsbSerialDriver;
 
-    private volatile ReceiverMasterThread mReceiverMasterThread = null;
+    private volatile ReceiverThread mReceiverMasterThread = null;
     private volatile ArduinoCommunicatorThread mArduinoThread = null;
 
-    private class ReceiverMasterThread extends Thread {
+    private class ReceiverThread extends Thread {
         
-        public ReceiverMasterThread() {
-            super("receiver_master_thread");
+        public ReceiverThread() {
+            super("receiver_thread");
         }
 
         @Override
         public void run() {
             Log.d(TAG, "Receiver thread started");
             
+            Socket socket = null;
+            InputStream inputStream;
+            
             try {
-                mServerSocket = new ServerSocket(PORT);
-                while(true) {
-                    Socket socket = mServerSocket.accept();
-                    new ReceiverSocketThread(socket, mNumSockets++).run();
-                }
-            } catch (IOException e) {
+                socket = new Socket(mIpAddress, mIpPort);
+                inputStream = socket.getInputStream();
+            } catch (Exception e) {
+                Toast.makeText(RCCarReceiverService.this, "Cannot connect to controller", Toast.LENGTH_LONG).show();
                 Log.e(TAG, "Error in server socket: " + e.toString());
+                if (socket != null) {
+                    try {
+                        socket.close();
+                    } catch (IOException e1) {
+                        Log.e(TAG, "Can't close socket: " + e1);
+                    }
+                }
+                return;
             }
-        }
-        
-        private ServerSocket mServerSocket;
-        private int mNumSockets;
-    }
-    
-    private class ReceiverSocketThread extends Thread {
-        
-        public ReceiverSocketThread(Socket socket, int nSocket) {
-            super("reciever_socket_" + nSocket);
-            mSocket = socket;
-        }
-
-        @Override
-        public void run() {
+            
             try {
-                InputStream inputStream = mSocket.getInputStream();
                 byte[] bytesRead = new byte[MESSAGE_LENGTH];
                 while (true) {
                     for (int i = 0; i < MESSAGE_LENGTH; i++) {
@@ -230,6 +229,8 @@ public class RCCarReceiverService extends Service {
                     
                     if (!validateMessage(bytesRead)) {
                         Log.w(TAG, "Invalid message received: " + bytesToHex(bytesRead));
+                        Toast.makeText(RCCarReceiverService.this, 
+                                "Invalid message received: " + bytesToHex(bytesRead), Toast.LENGTH_SHORT).show();
                         continue;
                     }
                     if (mArduinoThread == null || mArduinoThread.mHandler == null) {
@@ -245,11 +246,19 @@ public class RCCarReceiverService extends Service {
                 }
             } catch (IOException e) {
                 Log.e(TAG, "ReceiverSocketThread failed: " + e.toString());
+            } finally {
+                if (socket != null) {
+                    try {
+                        socket.close();
+                    } catch (IOException e) {
+                        Log.e(TAG, "Can't close socket: " + e);
+                    }
+                }
             }
         }
         
         private boolean validateMessage(byte[] bytesRead) {
-            if (bytesRead.length != 4) {
+            if (bytesRead.length != MESSAGE_LENGTH) {
                 return false;
             }
             
@@ -258,11 +267,10 @@ public class RCCarReceiverService extends Service {
             
             return Math.abs(leftMotorPower) <= 400 && Math.abs(rightMotorPower) <= 400;
         }
-
-        private final Socket mSocket;
+        
         private static final int MESSAGE_LENGTH = 4;
     }
-    
+
     private class ArduinoCommunicatorThread extends Thread {
 
         public ArduinoCommunicatorThread() {
@@ -287,6 +295,7 @@ public class RCCarReceiverService extends Service {
                             Log.w(TAG, "Can't write to USB: Port not opened.");
                         } else {
                             try {
+                                mUsbSerialPort.write(mHeader, 200);
                                 mUsbSerialPort.write(dataToSend, 200);
                             } catch (IOException e) {
                                 Log.w(TAG, "Failed to write to USB serial port: " + e);
@@ -305,6 +314,8 @@ public class RCCarReceiverService extends Service {
         public volatile Handler mHandler;
         
         public static final int MSG_SEND_TO_ANDROID = 10;
+        
+        private final byte[] mHeader = new byte[] { 0x7f, 0x7f, (byte)0x80, (byte)0x80 };
     }
     
     final private static char[] HEX_ARRAY = "0123456789ABCDEF".toCharArray();
@@ -317,6 +328,9 @@ public class RCCarReceiverService extends Service {
         }
         return new String(hexChars);
     }
+    
+    private String mIpAddress;
+    private int mIpPort;
 
     private static final String TAG = "RCCarReceiverService";
 
