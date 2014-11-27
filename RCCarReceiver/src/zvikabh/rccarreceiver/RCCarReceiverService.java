@@ -230,6 +230,7 @@ public class RCCarReceiverService extends Service {
                         Log.d(TAG, "Read byte: " + inputByte);
                         if (inputByte < 0) {
                             Log.i(TAG, "End of stream reached - closing thread");
+                            makeToast("End of stream reached - closing thread");
                             return;
                         }
                         bytesRead[i] = (byte) inputByte;
@@ -269,13 +270,18 @@ public class RCCarReceiverService extends Service {
                 return false;
             }
             
-            final short leftMotorPower = (short) (((short)bytesRead[0] & 0xff) | (((short) bytesRead[1]) << 8));
-            final short rightMotorPower = (short) (((short)bytesRead[2] & 0xff) | (((short) bytesRead[3]) << 8));
+            if (bytesRead[0] != 0x7f || bytesRead[1] != 0x7f || 
+                    bytesRead[2] != (byte)0x80 || bytesRead[3] != (byte)0x80) {
+                return false;
+            }
+            
+            final short leftMotorPower = (short) (((short)bytesRead[4] & 0xff) | (((short) bytesRead[5]) << 8));
+            final short rightMotorPower = (short) (((short)bytesRead[6] & 0xff) | (((short) bytesRead[7]) << 8));
             
             return Math.abs(leftMotorPower) <= 400 && Math.abs(rightMotorPower) <= 400;
         }
         
-        private static final int MESSAGE_LENGTH = 4;
+        private static final int MESSAGE_LENGTH = 8;
     }
 
     private class ArduinoCommunicatorThread extends Thread {
@@ -302,7 +308,6 @@ public class RCCarReceiverService extends Service {
                             Log.w(TAG, "Can't write to USB: Port not opened.");
                         } else {
                             try {
-                                mUsbSerialPort.write(mHeader, 200);
                                 mUsbSerialPort.write(dataToSend, 200);
                             } catch (IOException e) {
                                 Log.w(TAG, "Failed to write to USB serial port: " + e);
@@ -321,8 +326,6 @@ public class RCCarReceiverService extends Service {
         public volatile Handler mHandler;
         
         public static final int MSG_SEND_TO_ANDROID = 10;
-        
-        private final byte[] mHeader = new byte[] { 0x7f, 0x7f, (byte)0x80, (byte)0x80 };
     }
     
     final private static char[] HEX_ARRAY = "0123456789ABCDEF".toCharArray();
