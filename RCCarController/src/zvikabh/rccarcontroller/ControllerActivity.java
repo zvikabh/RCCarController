@@ -30,7 +30,10 @@ public class ControllerActivity extends Activity {
 
         setContentView(R.layout.activity_main);
 
-        bindService(new Intent(this, ConnectionHandlerService.class), mServiceConnection, Context.BIND_AUTO_CREATE);
+        Intent intent = new Intent(this, ConnectionHandlerService.class);
+        intent.putExtra(ConnectionHandlerService.ESTABLISH_CONNECTION_TYPE,
+                ConnectionHandlerService.EstablishConnectionTypes.NONE);
+        bindService(intent, mServiceConnection, Context.BIND_AUTO_CREATE);
 
         mViewSpeedController = (SpeedControllerView) findViewById(R.id.viewSpeedController);
         mViewSpeedController.setThrottleChangedListener(new ThrottleChangeListener());

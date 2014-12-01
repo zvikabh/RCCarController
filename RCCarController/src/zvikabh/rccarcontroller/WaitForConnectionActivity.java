@@ -34,7 +34,11 @@ public class WaitForConnectionActivity extends Activity {
         // The service is unbound from this activity in onDestroy, but remains running until
         // stopService is called when ControllerActivity is destroyed.
         startService(new Intent(this, ConnectionHandlerService.class));
-        bindService(new Intent(this, ConnectionHandlerService.class), mServiceConnection, Context.BIND_AUTO_CREATE);
+        
+        Intent intent = new Intent(this, ConnectionHandlerService.class);
+        intent.putExtra(ConnectionHandlerService.ESTABLISH_CONNECTION_TYPE, 
+                ConnectionHandlerService.EstablishConnectionTypes.INCOMING);
+        bindService(intent, mServiceConnection, Context.BIND_AUTO_CREATE);
     }
 
     @Override
