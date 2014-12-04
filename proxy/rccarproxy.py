@@ -5,16 +5,15 @@ import thread
 import time
 
 def main():
-	TCP_IP = '10.0.0.6'
 	RECEIVER_TCP_PORT = 5005
-	controller_TCP_PORT = 5006
+	CONTROLLER_TCP_PORT = 5006
 
 	receiver_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	receiver_socket.bind((TCP_IP, RECEIVER_TCP_PORT))
+	receiver_socket.bind(('', RECEIVER_TCP_PORT))
 	receiver_socket.listen(1)
 
 	controller_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	controller_socket.bind((TCP_IP, controller_TCP_PORT))
+	controller_socket.bind(('', CONTROLLER_TCP_PORT))
 	controller_socket.listen(1)
 	
 	#thread.start_new_thread(receiver_controller_thread, (receiver_socket, controller_socket))
@@ -26,10 +25,14 @@ def receiver_controller_thread(receiver_socket, controller_socket):
 	BUFFER_SIZE = 8
 
 	while True:
+		print 'Waiting for receiver connection...'
 		receiver_conn, receiver_addr = receiver_socket.accept()
-		print 'Receiver Connection address:', receiver_addr
+		print 'Receiver connected, address:', receiver_addr
+
+		print 'Waiting for controller connection...'
 		controller_conn, controller_addr = controller_socket.accept()
-		print 'Controller Connection address:', controller_addr
+		print 'Controller connected, address:', controller_addr
+
 		while True:
 			data = controller_conn.recv(BUFFER_SIZE)
 			if not data: 
@@ -54,7 +57,7 @@ def receiver_thread():
 	while True:
 		data = conn.recv(BUFFER_SIZE)
 		if not data: break
-		print "received data:", data
+		print 'received data:', data
 		conn.send(data)  # echo
 	conn.close()
 
@@ -70,13 +73,9 @@ def controller_thread():
 	while True:
 		data = conn.recv(BUFFER_SIZE)
 		if not data: break
-		print "received data:", data
+		print 'received data:', data
 		conn.send(data)  # echo
 	conn.close()
 
 if __name__=='__main__':
 	main()
-#thread.start_new_thread(receiver_thread, ())
-#thread.start_new_thread(controller_thread, ())
-#while True:
-#	time.sleep(1000)
