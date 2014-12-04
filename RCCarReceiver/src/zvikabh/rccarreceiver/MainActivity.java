@@ -21,10 +21,19 @@ public class MainActivity extends ActionBarActivity {
         setContentView(R.layout.activity_main);
         
         Button buttonConnect = (Button) findViewById(R.id.buttonConnect);
-        buttonConnect.setOnClickListener(new ClickListener());
+        buttonConnect.setOnClickListener(new ConnectClickListener());
+        
+        Button buttonDisconnect = (Button) findViewById(R.id.buttonDisconnect);
+        buttonDisconnect.setOnClickListener(new OnClickListener() {
+            
+            @Override
+            public void onClick(View view) {
+                stopService(new Intent(getApplicationContext(), RCCarReceiverService.class));
+            }
+        });
     }
     
-    private class ClickListener implements OnClickListener {
+    private class ConnectClickListener implements OnClickListener {
         
         @Override
         public void onClick(View button) {
@@ -40,6 +49,11 @@ public class MainActivity extends ActionBarActivity {
                 Toast.makeText(MainActivity.this, "Invalid port specified. Please try again.", Toast.LENGTH_LONG).show();
                 return;
             }
+            
+            // Stop any previously running versions of the service.
+            stopService(new Intent(getApplicationContext(), RCCarReceiverService.class));
+            
+            // Start the service.
             Intent serviceIntent = new Intent(getApplicationContext(), RCCarReceiverService.class);
             serviceIntent.putExtra(INTENT_EXTRA_IP_ADDRESS, ipAddress);
             serviceIntent.putExtra(INTENT_EXTRA_PORT, port);

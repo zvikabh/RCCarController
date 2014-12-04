@@ -40,7 +40,8 @@ public class RCCarReceiverService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(TAG, "Receiver service onStartCommand");
         synchronized (this) {
-            if (mReceiverMasterThread != null && mReceiverMasterThread.isAlive()) {
+            if (mReceiverThread != null && mReceiverThread.isAlive()) {
+                // This is not supposed to happen because MainActivity stops the service before restarting it.
                 makeToast("Receiver already running");
                 return START_STICKY;
             } 
@@ -62,7 +63,7 @@ public class RCCarReceiverService extends Service {
         // Register the receiver which will continue the startup sequence after the user grants
         // access permissions to the USB device.
         IntentFilter filter = new IntentFilter();
-        filter.addAction(ACTION_USB_PERMISSION);
+        filter.addAction(ACTION_REQUEST_USB_PERMISSION);
         registerReceiver(mBroadcastReceiver, filter);
 
         // Find the USB device and ask the user for permission to use it.
@@ -75,7 +76,28 @@ public class RCCarReceiverService extends Service {
     
     @Override
     public void onDestroy() {
+        Log.d(TAG, "Receiver service onDestroy");
         unregisterReceiver(mBroadcastReceiver);
+        
+        if (mReceiverThread != null && mReceiverThread.isAlive()) {
+            Log.d(TAG, "Interrupting receiver thread");
+            mReceiverThread.interrupt();
+        }
+        
+        if (mArduinoThread != null && mArduinoThread.isAlive()) {
+            Log.d(TAG, "Interrupting Arduino thread");
+            mArduinoThread.mHandler.getLooper().quit();
+        }
+        
+        try {
+            if (mUsbSerialPort != null) {
+                mUsbSerialPort.close();
+                mUsbSerialPort = null;
+            }
+        } catch (IOException e) {
+            Log.e(TAG, "Error while closing serial port: " + e.getMessage());
+        }
+        
         super.onDestroy();
     }
 
@@ -98,10 +120,9 @@ public class RCCarReceiverService extends Service {
                 
                 mUsbSerialDriver = driver;
                 
-                // Request user's permission to access the device.
-                // Processing continues in mBroadcastReceiver after user grants permission.
-                PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 0, new Intent(ACTION_USB_PERMISSION), 0);
-                usbManager.requestPermission(device, pendingIntent);
+                getUsbPermission(new Intent(ACTION_REQUEST_USB_PERMISSION));
+
+                Log.d(TAG, "findDevice() returns true");
                 return true;
             }
         }
@@ -110,6 +131,18 @@ public class RCCarReceiverService extends Service {
         makeToast("No Arduino devices found");
         stopSelf();
         return false;
+    }
+    
+    /**
+     * Requests user's permission to access the device referred to by mUsbSerialDriver.
+     * After the user grants (or denies) permission, processing continues by sending
+     * the provided intent to mBroadcastReceiver.
+     */
+    void getUsbPermission(Intent intent) {
+        UsbManager usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 0, intent, 0);
+        UsbDevice device = mUsbSerialDriver.getDevice();
+        usbManager.requestPermission(device, pendingIntent);
     }
 
     /**
@@ -120,8 +153,9 @@ public class RCCarReceiverService extends Service {
         @Override
         public void onReceive(Context context, Intent intent) {
             final String action = intent.getAction();
-            if (action.equals(ACTION_USB_PERMISSION)) {
+            if (action.equals(ACTION_REQUEST_USB_PERMISSION)) {
                 if (!intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
+                    makeToast("Permission denied while attempting to access USB device.");
                     Log.e(TAG, "User did not grant permission to use the device.");
                     stopSelf();
                     return;
@@ -129,12 +163,15 @@ public class RCCarReceiverService extends Service {
                 Log.d(TAG, "User granted permission to use the device.");
                 if (openUsbSerialPort()) {
                     // Start Internet receiver thread and Arduino communicator thread.
+                    makeToast("Connected to Arduino device");
+                    Log.d(TAG, "Connected to Arduino device");
+                    
                     synchronized (this) {
                         mArduinoThread = new ArduinoCommunicatorThread();
                         mArduinoThread.start();
 
-                        mReceiverMasterThread = new ReceiverThread();
-                        mReceiverMasterThread.start();
+                        mReceiverThread = new ReceiverThread();
+                        mReceiverThread.start();
                     }
                 }
             }
@@ -145,7 +182,7 @@ public class RCCarReceiverService extends Service {
     /**
      * Completes the setup of the connection to the Arduino device,
      * after the user has granted permission to access it.
-     * At this point, mUsbSerialDriver is set to the Arduino device.
+     * mUsbSerialDriver should already be set to the Arduino device.
      * Upon successful completion, mUsbSerialPort will point to the (opened) port.
      * Upon failure, mUsbSerialPort will be null.
      * @return true iff success
@@ -154,9 +191,8 @@ public class RCCarReceiverService extends Service {
         UsbManager usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
         UsbDeviceConnection connection = usbManager.openDevice(mUsbSerialDriver.getDevice());
         if (connection == null) {
-            // Strange - we were supposed to have already gotten permission.
-            Log.e(TAG, "No permission to access device");
-            makeToast("No permission to access device");
+            Log.e(TAG, "Device disconnected or permission denied");
+            makeToast("Device disconnected or permission denied");
             mUsbSerialPort = null;
             return false;
         }
@@ -188,7 +224,7 @@ public class RCCarReceiverService extends Service {
     private volatile UsbSerialPort mUsbSerialPort;
     private volatile UsbSerialDriver mUsbSerialDriver;
 
-    private volatile ReceiverThread mReceiverMasterThread = null;
+    private volatile ReceiverThread mReceiverThread = null;
     private volatile ArduinoCommunicatorThread mArduinoThread = null;
 
     private class ReceiverThread extends Thread {
@@ -197,24 +233,25 @@ public class RCCarReceiverService extends Service {
             super("receiver_thread");
         }
 
+        @SuppressWarnings("resource")  // Incorrectly complains of a resource leak.
         @Override
         public void run() {
             Log.d(TAG, "Receiver thread started");
             
             Socket socket = null;
-            InputStream inputStream;
+            InputStream inputStream = null;
             
             try {
                 socket = new Socket(mIpAddress, mIpPort);
                 inputStream = socket.getInputStream();
             } catch (Exception e) {
                 makeToast("Cannot connect to controller");
-                Log.e(TAG, "Error in server socket: " + e.toString());
+                Log.e(TAG, "Error in server socket: " + e.getMessage());
                 if (socket != null) {
                     try {
                         socket.close();
                     } catch (IOException e1) {
-                        Log.e(TAG, "Can't close socket: " + e1);
+                        Log.e(TAG, "Can't close socket: " + e1.getMessage());
                     }
                 }
                 return;
@@ -225,15 +262,32 @@ public class RCCarReceiverService extends Service {
             try {
                 byte[] bytesRead = new byte[MESSAGE_LENGTH];
                 while (true) {
+                    if (interrupted()) {
+                        Log.d(TAG, "Receiver thread interrupted. Stopping now.");
+                        return;
+                    }
                     for (int i = 0; i < MESSAGE_LENGTH; i++) {
-                        int inputByte = inputStream.read();
-                        Log.d(TAG, "Read byte: " + inputByte);
-                        if (inputByte < 0) {
-                            Log.i(TAG, "End of stream reached - closing thread");
-                            makeToast("End of stream reached - closing thread");
-                            return;
+                        // Checking for availability is required since inputStream.read() will block
+                        // until more data is received, and remain blocked even if the thread is interrupted.
+                        while (true) {
+                            if (inputStream.available() > 0) {
+                                int inputByte = inputStream.read();
+                                if (inputByte < 0) {
+                                    Log.i(TAG, "End of stream reached. Stopping receiver thread.");
+                                    makeToast("End of stream reached. Stopping receiver.");
+                                    return;
+                                }
+                                bytesRead[i] = (byte) inputByte;
+                                break;
+                            } else {
+                                try {
+                                    Thread.sleep(200);
+                                } catch (InterruptedException e) {
+                                    Log.d(TAG, "Receiver thread interrupted. Stopping thread.");
+                                    return;
+                                }
+                            }
                         }
-                        bytesRead[i] = (byte) inputByte;
                     }
                     
                     if (!validateMessage(bytesRead)) {
@@ -255,12 +309,15 @@ public class RCCarReceiverService extends Service {
             } catch (IOException e) {
                 Log.e(TAG, "ReceiverSocketThread failed: " + e.toString());
             } finally {
-                if (socket != null) {
-                    try {
-                        socket.close();
-                    } catch (IOException e) {
-                        Log.e(TAG, "Can't close socket: " + e);
+                try {
+                    if (inputStream != null) {
+                        inputStream.close();
                     }
+                    if (socket != null) {
+                        socket.close();
+                    }
+                } catch (IOException e) {
+                    Log.e(TAG, "Can't close inputStream or socket: " + e);
                 }
             }
         }
@@ -278,7 +335,13 @@ public class RCCarReceiverService extends Service {
             final short leftMotorPower = (short) (((short)bytesRead[4] & 0xff) | (((short) bytesRead[5]) << 8));
             final short rightMotorPower = (short) (((short)bytesRead[6] & 0xff) | (((short) bytesRead[7]) << 8));
             
-            return Math.abs(leftMotorPower) <= 400 && Math.abs(rightMotorPower) <= 400;
+            final boolean valid = Math.abs(leftMotorPower) <= 400 && Math.abs(rightMotorPower) <= 400;
+            
+            if (valid) {
+                Log.d(TAG, "Received valid message: L=" + leftMotorPower + ", R=" + rightMotorPower);
+            }
+            
+            return valid;
         }
         
         private static final int MESSAGE_LENGTH = 8;
@@ -299,19 +362,19 @@ public class RCCarReceiverService extends Service {
 
                 @Override
                 public void handleMessage(Message msg) {
-                    Log.d(TAG, "Received message: " + msg.what);
-                    
                     if (msg.what == MSG_SEND_TO_ANDROID) {
                         final byte[] dataToSend = (byte[]) msg.obj;
                         
                         if (mUsbSerialPort == null) {
-                            Log.w(TAG, "Can't write to USB: Port not opened.");
-                        } else {
-                            try {
-                                mUsbSerialPort.write(dataToSend, 200);
-                            } catch (IOException e) {
-                                Log.w(TAG, "Failed to write to USB serial port: " + e);
-                            }
+                            Log.w(TAG, "Can't write to USB port: Port not opened");
+                            return;
+                        } 
+                        
+                        try {
+                            mUsbSerialPort.write(dataToSend, 200);
+                        } catch (IOException e) {
+                            Log.w(TAG, "Failed to write to USB serial port: " + e.getMessage());
+                            makeToast("Disconnected from Arduino, please reconnect cable and click Connect.");
                         }
                     } else {
                         Log.w(TAG, "Unrecognized message: " + msg.toString());
@@ -321,6 +384,8 @@ public class RCCarReceiverService extends Service {
             };
 
             Looper.loop();
+            
+            Log.d(TAG, "Arduino thread done.");
         }
         
         public volatile Handler mHandler;
@@ -356,7 +421,7 @@ public class RCCarReceiverService extends Service {
 
     private static final String TAG = "RCCarReceiverService";
 
-    private static final String ACTION_USB_PERMISSION = "zvikabh.rccarcontroller.USB_PERMISSION";
+    private static final String ACTION_REQUEST_USB_PERMISSION = "zvikabh.rccarcontroller.REQUEST_USB_PERMISSION";
     
     // Values used in Arduino Communicator
     private static final int ARDUINO_USB_VENDOR_ID = 0x2341;
