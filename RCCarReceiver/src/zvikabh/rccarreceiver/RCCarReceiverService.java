@@ -233,27 +233,12 @@ public class RCCarReceiverService extends Service {
             super("receiver_thread");
         }
 
-        @SuppressWarnings("resource")  // Incorrectly complains of a resource leak.
         @Override
         public void run() {
             Log.d(TAG, "Receiver thread started");
             
-            Socket socket = null;
-            InputStream inputStream = null;
-            
-            try {
-                socket = new Socket(mIpAddress, mIpPort);
-                inputStream = socket.getInputStream();
-            } catch (Exception e) {
-                makeToast("Cannot connect to controller");
-                Log.e(TAG, "Error in server socket: " + e.getMessage());
-                if (socket != null) {
-                    try {
-                        socket.close();
-                    } catch (IOException e1) {
-                        Log.e(TAG, "Can't close socket: " + e1.getMessage());
-                    }
-                }
+            if (!openSocket()) {
+                // Failed to connect; message has already been shown to user. Thread aborts.
                 return;
             }
             
@@ -266,30 +251,14 @@ public class RCCarReceiverService extends Service {
                         Log.d(TAG, "Receiver thread interrupted. Stopping now.");
                         return;
                     }
-                    for (int i = 0; i < MESSAGE_LENGTH; i++) {
-                        // Checking for availability is required since inputStream.read() will block
-                        // until more data is received, and remain blocked even if the thread is interrupted.
-                        while (true) {
-                            if (inputStream.available() > 0) {
-                                int inputByte = inputStream.read();
-                                if (inputByte < 0) {
-                                    Log.i(TAG, "End of stream reached. Stopping receiver thread.");
-                                    makeToast("End of stream reached. Stopping receiver.");
-                                    return;
-                                }
-                                bytesRead[i] = (byte) inputByte;
-                                break;
-                            } else {
-                                try {
-                                    Thread.sleep(200);
-                                } catch (InterruptedException e) {
-                                    Log.d(TAG, "Receiver thread interrupted. Stopping thread.");
-                                    return;
-                                }
-                            }
-                        }
-                    }
                     
+                    if (!receiveMessage(bytesRead)) {
+                        // Connection failed and could not be restored.
+                        // User has already been notified.
+                        // Close thread.
+                        return;
+                    }
+
                     if (!validateMessage(bytesRead)) {
                         Log.w(TAG, "Invalid message received: " + bytesToHex(bytesRead));
                         makeToast("Invalid message received: " + bytesToHex(bytesRead));
@@ -306,22 +275,89 @@ public class RCCarReceiverService extends Service {
                     // the Arduino thread processes it.
                     bytesRead = new byte[MESSAGE_LENGTH];
                 }
-            } catch (IOException e) {
-                Log.e(TAG, "ReceiverSocketThread failed: " + e.toString());
             } finally {
-                try {
-                    if (inputStream != null) {
-                        inputStream.close();
-                    }
-                    if (socket != null) {
-                        socket.close();
-                    }
-                } catch (IOException e) {
-                    Log.e(TAG, "Can't close inputStream or socket: " + e);
-                }
+                closeSocket();
             }
         }
+
+        private boolean receiveMessage(byte[] bytesRead) {
+            for (int i = 0; i < MESSAGE_LENGTH; i++) {
+                while (true) {
+                    try {
+                        // Checking for availability is required since inputStream.read() will block
+                        // until more data is received, and remain blocked even if the thread is interrupted.
+                        if (mInputStream.available() > 0) {
+                            int inputByte = mInputStream.read();
+                            if (inputByte < 0) {
+                                Log.e(TAG, "End of stream reached. Attempting to re-open.");
+                                closeSocket();
+                                if (openSocket()) {
+                                    // Successfully reconnected. Attempt to receive a new message.
+                                    return receiveMessage(bytesRead);
+                                } else {
+                                    Log.e(TAG, "Failed to re-open stream. Aborting thread.");
+                                    makeToast("Connection closed and could not be re-opened.");
+                                    return false;
+                                }
+                            }
+                            bytesRead[i] = (byte) inputByte;
+                            break;
+                        } else {
+                            Thread.sleep(200);
+                        }
+                    } catch (IOException e) {
+                        Log.e(TAG, e.getMessage());
+                        closeSocket();
+                        if (openSocket()) {
+                            // Successfully reconnected. Attempt to receive a new message.
+                            return receiveMessage(bytesRead);
+                        } else {
+                            Log.e(TAG, "Failed to re-open stream. Aborting thread.");
+                            makeToast("Connection failed and could not be re-opened.");
+                            return false;
+                        }
+                    } catch (InterruptedException e) {
+                        Log.d(TAG, "Receiver thread interrupted. Stopping thread.");
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        private boolean openSocket() {
+            try {
+                mSocket = new Socket(mIpAddress, mIpPort);
+                mInputStream = mSocket.getInputStream();
+            } catch (Exception e) {
+                makeToast("Cannot connect to controller");
+                Log.e(TAG, "Error in server socket: " + e.getMessage());
+                if (mSocket != null) {
+                    try {
+                        mSocket.close();
+                    } catch (IOException e1) {
+                        Log.e(TAG, "Can't close socket: " + e1.getMessage());
+                    }
+                }
+                return false;
+            }
+            
+            return true;
+        }
         
+        private void closeSocket() {
+            try {
+                if (mInputStream != null) {
+                    mInputStream.close();
+                }
+                if (mSocket != null) {
+                    mSocket.close();
+                }
+            } catch (IOException e) {
+                Log.e(TAG, "Can't close inputStream or socket: " + e);
+            }
+        }
+
         private boolean validateMessage(byte[] bytesRead) {
             if (bytesRead.length != MESSAGE_LENGTH) {
                 return false;
@@ -343,6 +379,9 @@ public class RCCarReceiverService extends Service {
             
             return valid;
         }
+        
+        private Socket mSocket;
+        private InputStream mInputStream;
         
         private static final int MESSAGE_LENGTH = 8;
     }
