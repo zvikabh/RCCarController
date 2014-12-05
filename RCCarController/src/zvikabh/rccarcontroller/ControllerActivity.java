@@ -13,8 +13,7 @@ import android.view.MenuItem;
 
 
 /**
- * Main activity for controlling the RC car.
- * Portions taken from Arduino Communicator, https://github.com/jeppsson/Arduino-Communicator
+ * Activity for controlling the RC car.
  */
 public class ControllerActivity extends Activity {
 

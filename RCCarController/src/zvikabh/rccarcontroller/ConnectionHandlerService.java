@@ -87,7 +87,7 @@ public class ConnectionHandlerService extends Service {
         
         public boolean sendData(byte[] data) {
             if (!isConnected()) {
-                Log.e(TAG, "Attempting to send data before socket is connected");
+                Log.e(TAG, "Attempting to send data when socket is not connected");
                 return false;
             }
             ConnectionHandlerService.this.mCommThread.mHandler.obtainMessage(SEND_DATA, data).sendToTarget();
