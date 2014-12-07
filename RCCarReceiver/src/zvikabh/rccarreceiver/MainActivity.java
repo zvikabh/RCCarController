@@ -1,7 +1,11 @@
 package zvikabh.rccarreceiver;
 
+import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.ActionBarActivity;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
@@ -10,6 +14,7 @@ import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 
@@ -19,6 +24,8 @@ public class MainActivity extends ActionBarActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        
+        mStatusTextView = (TextView) findViewById(R.id.textViewStatus);
         
         Button buttonConnect = (Button) findViewById(R.id.buttonConnect);
         buttonConnect.setOnClickListener(new ConnectClickListener());
@@ -31,8 +38,20 @@ public class MainActivity extends ActionBarActivity {
                 stopService(new Intent(getApplicationContext(), RCCarReceiverService.class));
             }
         });
+        
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(RCCarReceiverService.INTENT_ACTION_STATUS_UPDATE);
+        mBroadcastManager.registerReceiver(mStatusUpdateReceiver, intentFilter);
     }
     
+    
+    
+    @Override
+    protected void onDestroy() {
+        mBroadcastManager.unregisterReceiver(mStatusUpdateReceiver);
+        super.onDestroy();
+    }
+
     private class ConnectClickListener implements OnClickListener {
         
         @Override
@@ -61,6 +80,17 @@ public class MainActivity extends ActionBarActivity {
         }
         
     }
+    
+    private BroadcastReceiver mStatusUpdateReceiver = new BroadcastReceiver() {
+        
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent.getAction().equals(RCCarReceiverService.INTENT_ACTION_STATUS_UPDATE)) {
+                final String status = intent.getStringExtra(RCCarReceiverService.INTENT_EXTRA_STATUS_MESSAGE);
+                mStatusTextView.setText(status);
+            }
+        }
+    };
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -80,6 +110,9 @@ public class MainActivity extends ActionBarActivity {
         }
         return super.onOptionsItemSelected(item);
     }
+    
+    private LocalBroadcastManager mBroadcastManager = LocalBroadcastManager.getInstance(this);
+    private TextView mStatusTextView;
     
     private static final String TAG = "rccarreceiver.MainActivity";
     

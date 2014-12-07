@@ -15,10 +15,12 @@ import android.content.IntentFilter;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
+import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
+import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -32,7 +34,7 @@ public class RCCarReceiverService extends Service {
     }
 
     @Override
-    public IBinder onBind(Intent arg0) {
+    public IBinder onBind(Intent intent) {
         return null;
     }
 
@@ -260,8 +262,7 @@ public class RCCarReceiverService extends Service {
                     }
 
                     if (!validateMessage(bytesRead)) {
-                        Log.w(TAG, "Invalid message received: " + bytesToHex(bytesRead));
-                        makeToast("Invalid message received: " + bytesToHex(bytesRead));
+                        // User has already been notified
                         continue;
                     }
                     if (mArduinoThread == null || mArduinoThread.mHandler == null) {
@@ -360,11 +361,13 @@ public class RCCarReceiverService extends Service {
 
         private boolean validateMessage(byte[] bytesRead) {
             if (bytesRead.length != MESSAGE_LENGTH) {
+                notifyInvalidMessage(bytesRead);
                 return false;
             }
             
             if (bytesRead[0] != 0x7f || bytesRead[1] != 0x7f || 
                     bytesRead[2] != (byte)0x80 || bytesRead[3] != (byte)0x80) {
+                notifyInvalidMessage(bytesRead);
                 return false;
             }
             
@@ -374,12 +377,18 @@ public class RCCarReceiverService extends Service {
             final boolean valid = Math.abs(leftMotorPower) <= 400 && Math.abs(rightMotorPower) <= 400;
             
             if (valid) {
+                postStatusMessage("L=" + leftMotorPower + ",  R=" + rightMotorPower);
                 Log.d(TAG, "Received valid message: L=" + leftMotorPower + ", R=" + rightMotorPower);
             }
             
             return valid;
         }
         
+        private void notifyInvalidMessage(byte[] bytesRead) {
+            Log.w(TAG, "Invalid message received: " + bytesToHex(bytesRead));
+            postStatusMessage("Invalid message received: " + bytesToHex(bytesRead));
+        }
+
         private Socket mSocket;
         private InputStream mInputStream;
         
@@ -431,7 +440,7 @@ public class RCCarReceiverService extends Service {
         
         public static final int MSG_SEND_TO_ANDROID = 10;
     }
-    
+
     final private static char[] HEX_ARRAY = "0123456789ABCDEF".toCharArray();
     private static String bytesToHex(byte[] bytes) {
         char[] hexChars = new char[bytes.length * 2];
@@ -455,12 +464,23 @@ public class RCCarReceiverService extends Service {
         });
     }
     
+    void postStatusMessage(final String statusMessage) {
+        Intent intent = new Intent(INTENT_ACTION_STATUS_UPDATE);
+        intent.putExtra(INTENT_EXTRA_STATUS_MESSAGE, statusMessage);
+        mLocalBroadcastManager.sendBroadcast(intent);
+    }
+    
+    final static String INTENT_ACTION_STATUS_UPDATE = "zvikabh.rccarreceiver.INTENT_STATUS_UPDATE"; 
+    final static String INTENT_EXTRA_STATUS_MESSAGE = "zvikabh.rccarreceiver.INTENT_EXTRA_STATUS_MESSAGE";
+    
+    private final LocalBroadcastManager mLocalBroadcastManager = LocalBroadcastManager.getInstance(this);
+    
     private String mIpAddress = null;
     private int mIpPort = -1;
 
     private static final String TAG = "RCCarReceiverService";
 
-    private static final String ACTION_REQUEST_USB_PERMISSION = "zvikabh.rccarcontroller.REQUEST_USB_PERMISSION";
+    private static final String ACTION_REQUEST_USB_PERMISSION = "zvikabh.rccarreceiver.REQUEST_USB_PERMISSION";
     
     // Values used in Arduino Communicator
     private static final int ARDUINO_USB_VENDOR_ID = 0x2341;
