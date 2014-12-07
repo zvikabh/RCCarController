@@ -142,14 +142,28 @@ public class ConnectionHandlerService extends Service {
                             mOutputStream.write(dataToSend);
                         } catch (IOException e) {
                             Log.e(TAG, "IOException while writing data to socket stream: " + e.getMessage());
-                            makeToast("Disconnected from RC receiver");
-                            mHandler.getLooper().quit();
+                            closeConnection();
+                            while (!createConnection()) {
+                                makeToast("Connection lost, will attempt to reconnect again in 5 seconds");
+                                closeConnection();
+                                try {
+                                    Thread.sleep(5000);
+                                } catch (InterruptedException e1) {
+                                    Log.e(TAG, "Thread interrupted while attempting to reopen connection: " + e.getMessage());
+                                    return;
+                                }
+                            }
+                            makeToast("Connection restored!");
                         }
                     }
                 }
             };
             
-            createConnection();
+            if (!createConnection()) {
+                makeToast("Failed to connect.");
+                stopSelf();
+                return;
+            }
             
             mIsConnected = true;
             mBinder.notifyConnected();
@@ -170,7 +184,7 @@ public class ConnectionHandlerService extends Service {
             return mSocket.isOutputShutdown();
         }
         
-        protected abstract void createConnection();
+        protected abstract boolean createConnection();
         protected abstract void closeConnection();
         
         protected Socket mSocket;
@@ -186,7 +200,7 @@ public class ConnectionHandlerService extends Service {
     private class IncomingConnectionThread extends ConnectionThread {
 
         @Override
-        protected void createConnection() {
+        protected boolean createConnection() {
             try {
                 mServerSocket = new ServerSocket(PORT);
                 mSocket = mServerSocket.accept();
@@ -194,7 +208,9 @@ public class ConnectionHandlerService extends Service {
             } catch (IOException e) {
                 makeToast("Failed to create incoming connection.");
                 Log.e(TAG, "Failed to create incoming connection: " + e.getMessage());
+                return false;
             }
+            return true;
         }
 
         @Override
@@ -228,14 +244,16 @@ public class ConnectionHandlerService extends Service {
         }
         
         @Override
-        protected void createConnection() {
+        protected boolean createConnection() {
             try {
                 mSocket = new Socket(mAddress, mPort);
                 mOutputStream = mSocket.getOutputStream();
             } catch(Exception e) {
                 makeToast("Could not create connection to " + mAddress + ":" + mPort);
                 Log.e(TAG, "Could not create connection to " + mAddress + ":" + mPort + ":" + e.getMessage());
+                return false;
             }
+            return true;
         }
         
         @Override
