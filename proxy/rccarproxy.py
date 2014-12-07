@@ -24,19 +24,27 @@ def main():
   receiver_thread.join()
 
 
+def ConnectSocket(s, name):
+  conn, addr = s.accept()
+  print '%s connected to %s' % (name, addr)
+  return conn
+
 def ControllerThread(queue, port):
   s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
   s.bind(('', port))
   s.listen(1)
 
-  conn, addr = s.accept()
-  print 'Controller connected to address:', addr
+  conn = ConnectSocket(s, 'Controller')
 
   while True:
     data = conn.recv(BUFFER_SIZE)
+    if not data:
+      print 'Controller disconnected - attempting to reconnect'
+      conn.close()
+      conn = ConnectSocket(s, 'Controller')
+      continue
     print 'From controller: ', ''.join(['%02X ' % ord(b) for b in data])
     queue.put(data)
-    if not data: break
 
   conn.close()
 
@@ -46,13 +54,17 @@ def ReceiverThread(queue, port):
   s.bind(('', port))
   s.listen(1)
 
-  conn, addr = s.accept()
-  print 'Receiver connected to address: ', addr
+  conn = ConnectSocket(s, 'Receiver')
 
   while True:
     data = queue.get()
-    if not data: break
-    conn.send(data)
+    try:
+      conn.sendall(data)
+    except:
+      print 'Receiver disconnected - attempting to reconnect'
+      conn.close()
+      conn = ConnectSocket(s, 'Receiver')
+      continue
     print 'To receiver: ', ''.join(['%02X ' % ord(b) for b in data])
 
   conn.close()
