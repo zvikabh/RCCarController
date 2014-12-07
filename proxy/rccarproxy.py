@@ -1,81 +1,62 @@
 #!/usr/bin/python
 
+import Queue
 import socket
-import thread
+import threading
 import time
 
+RECEIVER_TCP_PORT = 5005
+CONTROLLER_TCP_PORT = 5006
+
+BUFFER_SIZE = 8
+
+
 def main():
-	RECEIVER_TCP_PORT = 5005
-	CONTROLLER_TCP_PORT = 5006
+  queue = Queue.Queue()
 
-	receiver_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	receiver_socket.bind(('', RECEIVER_TCP_PORT))
-	receiver_socket.listen(1)
+  controller_thread = threading.Thread(target=ControllerThread, args=(queue, CONTROLLER_TCP_PORT))
+  receiver_thread = threading.Thread(target=ReceiverThread, args=(queue, RECEIVER_TCP_PORT))
 
-	controller_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	controller_socket.bind(('', CONTROLLER_TCP_PORT))
-	controller_socket.listen(1)
-	
-	#thread.start_new_thread(receiver_controller_thread, (receiver_socket, controller_socket))
-	receiver_controller_thread(receiver_socket, controller_socket)
-	
+  controller_thread.start()
+  receiver_thread.start()
+
+  controller_thread.join()
+  receiver_thread.join()
 
 
-def receiver_controller_thread(receiver_socket, controller_socket):
-	BUFFER_SIZE = 8
+def ControllerThread(queue, port):
+  s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+  s.bind(('', port))
+  s.listen(1)
 
-	while True:
-		print 'Waiting for receiver connection...'
-		receiver_conn, receiver_addr = receiver_socket.accept()
-		print 'Receiver connected, address:', receiver_addr
+  conn, addr = s.accept()
+  print 'Controller connected to address:', addr
 
-		print 'Waiting for controller connection...'
-		controller_conn, controller_addr = controller_socket.accept()
-		print 'Controller connected, address:', controller_addr
+  while True:
+    data = conn.recv(BUFFER_SIZE)
+    print 'From controller: ', ''.join(['%02X ' % ord(b) for b in data])
+    queue.put(data)
+    if not data: break
 
-		while True:
-			data = controller_conn.recv(BUFFER_SIZE)
-			if not data: 
-				print "Can't read data"
-				break
-			print 'received data: ' + ' '.join(['%02X' % ord(b) for b in data])
-			receiver_conn.send(data)  # pass this to the receiver
-			print 'sent'
-		print 'closing'
-		receiver_conn.close()
-		controller_conn.close()
+  conn.close()
 
-def receiver_thread():
-	TCP_PORT = 5005
 
-	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	s.bind((TCP_IP, TCP_PORT))
-	s.listen(1)
+def ReceiverThread(queue, port):
+  s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+  s.bind(('', port))
+  s.listen(1)
 
-	conn, addr = s.accept()
-	print 'Connection address:', addr
-	while True:
-		data = conn.recv(BUFFER_SIZE)
-		if not data: break
-		print 'received data:', data
-		conn.send(data)  # echo
-	conn.close()
+  conn, addr = s.accept()
+  print 'Receiver connected to address: ', addr
 
-def controller_thread():
-	TCP_PORT = 5006
+  while True:
+    data = queue.get()
+    if not data: break
+    conn.send(data)
+    print 'To receiver: ', ''.join(['%02X ' % ord(b) for b in data])
 
-	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	s.bind((TCP_IP, TCP_PORT))
-	s.listen(1)
+  conn.close()
 
-	conn, addr = s.accept()
-	print 'Connection address:', addr
-	while True:
-		data = conn.recv(BUFFER_SIZE)
-		if not data: break
-		print 'received data:', data
-		conn.send(data)  # echo
-	conn.close()
 
-if __name__=='__main__':
-	main()
+if __name__ == '__main__':
+  main()
