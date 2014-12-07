@@ -143,8 +143,10 @@ public class ConnectionHandlerService extends Service {
                         } catch (IOException e) {
                             Log.e(TAG, "IOException while writing data to socket stream: " + e.getMessage());
                             closeConnection();
-                            while (!createConnection()) {
+                            int i = 0;
+                            for (i = 0; !createConnection(); ++i) {
                                 makeToast("Connection lost, will attempt to reconnect again in 5 seconds");
+                                Log.e(TAG, "Connection lost, will attempt to reconnect again in 5 seconds (attempt " + i + ")");
                                 closeConnection();
                                 try {
                                     Thread.sleep(5000);
@@ -153,6 +155,7 @@ public class ConnectionHandlerService extends Service {
                                     return;
                                 }
                             }
+                            Log.i(TAG, "Connection restored after " + i + " attempts");
                             makeToast("Connection restored!");
                         }
                     }
