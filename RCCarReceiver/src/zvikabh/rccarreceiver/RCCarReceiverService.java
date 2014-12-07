@@ -49,6 +49,8 @@ public class RCCarReceiverService extends Service {
             } 
         }
         
+        postStatusMessage("Receiver service starting");
+
         if (intent == null) { 
             // Attempting to restart the service. 
             // Keep the IP address and port from the previous call.
@@ -67,17 +69,21 @@ public class RCCarReceiverService extends Service {
         IntentFilter filter = new IntentFilter();
         filter.addAction(ACTION_REQUEST_USB_PERMISSION);
         registerReceiver(mBroadcastReceiver, filter);
-
+        
         // Find the USB device and ask the user for permission to use it.
         if (findDevice()) {
+            postStatusMessage("Arduino device found, getting permission to access it");
             return START_STICKY;  // Device found. Keep the service running.
         } else {
+            postStatusMessage("Arduino device not found");
             return START_NOT_STICKY;  // Device not found. Stop the service.
         }
     }
     
     @Override
     public void onDestroy() {
+        postStatusMessage("Disconnecting");
+        
         Log.d(TAG, "Receiver service onDestroy");
         unregisterReceiver(mBroadcastReceiver);
         
@@ -99,6 +105,8 @@ public class RCCarReceiverService extends Service {
         } catch (IOException e) {
             Log.e(TAG, "Error while closing serial port: " + e.getMessage());
         }
+        
+        postStatusMessage("Disconnected");
         
         super.onDestroy();
     }
@@ -163,6 +171,7 @@ public class RCCarReceiverService extends Service {
                     return;
                 }
                 Log.d(TAG, "User granted permission to use the device.");
+                postStatusMessage("User granted permission to use the device.");
                 if (openUsbSerialPort()) {
                     // Start Internet receiver thread and Arduino communicator thread.
                     makeToast("Connected to Arduino device");

@@ -25,6 +25,7 @@ public class MainActivity extends ActionBarActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         
+        mBroadcastManager = LocalBroadcastManager.getInstance(this);
         mStatusTextView = (TextView) findViewById(R.id.textViewStatus);
         
         Button buttonConnect = (Button) findViewById(R.id.buttonConnect);
@@ -111,7 +112,7 @@ public class MainActivity extends ActionBarActivity {
         return super.onOptionsItemSelected(item);
     }
     
-    private LocalBroadcastManager mBroadcastManager = LocalBroadcastManager.getInstance(this);
+    private LocalBroadcastManager mBroadcastManager;
     private TextView mStatusTextView;
     
     private static final String TAG = "rccarreceiver.MainActivity";

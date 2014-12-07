@@ -141,12 +141,12 @@ public class ConnectionHandlerService extends Service {
                             Log.d(TAG, "Sending message: " + bytesToHex(dataToSend));
                             mOutputStream.write(dataToSend);
                         } catch (IOException e) {
+                            makeToast("Connection lost, attempting to reconnect.");
                             Log.e(TAG, "IOException while writing data to socket stream: " + e.getMessage());
                             closeConnection();
-                            int i = 0;
+                            int i;
                             for (i = 0; !createConnection(); ++i) {
-                                makeToast("Connection lost, will attempt to reconnect again in 5 seconds");
-                                Log.e(TAG, "Connection lost, will attempt to reconnect again in 5 seconds (attempt " + i + ")");
+                                Log.e(TAG, "Connection still lost, will attempt to reconnect again in 5 seconds (attempt " + i + ")");
                                 closeConnection();
                                 try {
                                     Thread.sleep(5000);
@@ -206,7 +206,9 @@ public class ConnectionHandlerService extends Service {
         protected boolean createConnection() {
             try {
                 mServerSocket = new ServerSocket(PORT);
+                Log.d(TAG, "Waiting for incoming connection");
                 mSocket = mServerSocket.accept();
+                Log.d(TAG, "Incoming connection accepted");
                 mOutputStream = mSocket.getOutputStream();
             } catch (IOException e) {
                 makeToast("Failed to create incoming connection.");

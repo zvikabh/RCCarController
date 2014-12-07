@@ -17,7 +17,7 @@ import android.view.MenuItem;
  */
 public class ControllerActivity extends Activity {
 
-    private static final String TAG = "rccarcontroller.MainActivity";
+    private static final String TAG = "ControllerActivity";
 
     private SpeedControllerView mViewSpeedController;
 
@@ -120,8 +120,6 @@ public class ControllerActivity extends Activity {
             data[5] = (byte) ((leftPowerLevel >> 8) & 0xFF);
             data[6] = (byte) (rightPowerLevel & 0xFF);
             data[7] = (byte) ((rightPowerLevel >> 8) & 0xFF);
-
-            Log.d(TAG, "L="+leftPowerLevel+"  R="+rightPowerLevel);
 
             mConnectionBinder.sendData(data);
         }
