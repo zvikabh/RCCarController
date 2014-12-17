@@ -15,7 +15,6 @@ import android.content.IntentFilter;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
-import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -489,13 +488,13 @@ public class RCCarReceiverService extends Service {
 
     private static final String TAG = "RCCarReceiverService";
 
-    private static final String ACTION_REQUEST_USB_PERMISSION = "zvikabh.rccarreceiver.REQUEST_USB_PERMISSION";
+    static final String ACTION_REQUEST_USB_PERMISSION = "zvikabh.rccarreceiver.REQUEST_USB_PERMISSION";
     
     // Values used in Arduino Communicator
-    private static final int ARDUINO_USB_VENDOR_ID = 0x2341;
-    private static final int ARDUINO_UNO_USB_PRODUCT_ID = 0x0001;
+    static final int ARDUINO_USB_VENDOR_ID = 0x2341;
+    static final int ARDUINO_UNO_USB_PRODUCT_ID = 0x0001;
 
     // Values used by my Arduino clone
-    private static final int ARDUINO_CLONE_VENDOR_ID = 0x0403;  // 1027
-    private static final int ARDUINO_CLONE_PRODUCT_ID = 0x6001;  // 24577
+    static final int ARDUINO_CLONE_VENDOR_ID = 0x0403;  // 1027
+    static final int ARDUINO_CLONE_PRODUCT_ID = 0x6001;  // 24577
 }

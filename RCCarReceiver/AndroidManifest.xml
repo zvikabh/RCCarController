@@ -9,6 +9,7 @@
         android:targetSdkVersion="21" />
 
     <uses-feature android:name="android.hardware.usb.host" />
+
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
@@ -30,6 +31,15 @@
             android:name=".RCCarReceiverService"
             android:enabled="true"
             android:label="RC Car Receiver Service" />
+
+        <activity
+            android:name=".DirectControlActivity"
+            android:label="@string/title_activity_direct_control"
+            android:parentActivityName=".MainActivity" >
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="zvikabh.rccarreceiver.MainActivity" />
+        </activity>
     </application>
 
 </manifest>

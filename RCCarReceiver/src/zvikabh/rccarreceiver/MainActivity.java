@@ -40,6 +40,16 @@ public class MainActivity extends ActionBarActivity {
             }
         });
         
+        Button buttonDirectControl = (Button) findViewById(R.id.buttonDirectControl);
+        buttonDirectControl.setOnClickListener(new OnClickListener() {
+            
+            @Override
+            public void onClick(View view) {
+                Intent intent = new Intent(MainActivity.this, DirectControlActivity.class);
+                startActivity(intent);
+            }
+        });
+        
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(RCCarReceiverService.INTENT_ACTION_STATUS_UPDATE);
         mBroadcastManager.registerReceiver(mStatusUpdateReceiver, intentFilter);
