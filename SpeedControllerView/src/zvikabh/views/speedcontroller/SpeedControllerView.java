@@ -1,4 +1,4 @@
-package zvikabh.rccarcontroller;
+package zvikabh.views.speedcontroller;
 
 import android.annotation.SuppressLint;
 import android.content.Context;

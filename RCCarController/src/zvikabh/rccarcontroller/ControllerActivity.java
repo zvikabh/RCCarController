@@ -11,6 +11,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 
+import zvikabh.views.speedcontroller.SpeedControllerView;
 
 /**
  * Activity for controlling the RC car.
